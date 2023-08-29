@@ -157,7 +157,8 @@ sudo yum install https://dl.fedoraproject.org/pub/epel/epel-release-latest-8.noa
 sudo yum install yum-utils http://rpms.remirepo.net/enterprise/remi-release-8.rpm
 sudo yum module list php
 sudo yum module reset php
-sudo yum module enable php:remi-7.4
+sudo dnf module enable php:8.1
+sudo dnf module -y install php:8.1/common
 sudo yum install php php-opcache php-gd php-curl php-mysqlnd
 sudo systemctl start php-fpm
 sudo systemctl enable php-fpm
@@ -167,7 +168,7 @@ sudo setsebool -P httpd_execmem 1
 
 `sudo systemctl restart httpd`
 
-* Download wordpress and copy wordpress to `var/www/html`
+* **Download wordpress and copy wordpress to `var/www/html`**
 
 ```
 mkdir wordpress
@@ -185,7 +186,7 @@ sudo chcon -t httpd_sys_rw_content_t /var/www/html/wordpress -R
 sudo setsebool -P httpd_can_network_connect=1
 ```
 
-## Step 4 — Install MySQL on your DB Server EC2
+## Step 4 — Install mysql on DB Server EC2
 
 ```
 sudo yum update
@@ -203,27 +204,49 @@ sudo systemctl enable mysqld
 ```
 sudo mysql
 CREATE DATABASE wordpress;
-CREATE USER `myuser`@`<Web-Server-Private-IP-Address>` IDENTIFIED BY 'mypass';
-GRANT ALL ON wordpress.* TO 'myuser'@'<Web-Server-Private-IP-Address>';
+CREATE DATABASE wordpress;
+CREATE USER 'wordpress'@'%' IDENTIFIED WITH mysql_native_password BY 'wordpress';
+ GRANT ALL PRIVILEGES ON *.* TO 'wordpress'@'%' WITH GRANT OPTION;
 FLUSH PRIVILEGES;
-SHOW DATABASES;
-exit
 ```
+
+**See all users and hosts**
+`select user, host from mysql.user; `
+
+`SHOW DATABASES;`
 
 ![NGINX Status](./Images-6/Image-6.14.jpg)
 
+`exit`
+
+
+* **Configure MySQL server to allow connections from remote hosts i.e set the bind address** 
+
+`sudo vi /etc/my.cnf`
+
+![NGINX Status](./Images-6/Image-6.17.jpg)
+
+ **Restart the service**
+
+`sudo systemctl restart mysqld`
+
 ## Step 6 — Configure WordPress to connect to remote database.
 
-Hint: Do not forget to open MySQL port 3306 on DB Server EC2. For extra security, you shall allow access to the DB server ONLY from your Web Server’s IP address, so in the Inbound Rule configuration specify source as /32. OR open **ALL TRAFFIC**
+
+Hint: Do not forget to open MySQL port 3306 on DB Server EC2. For extra security, you shall allow access to the DB server ONLY from your Web Server’s IP address, so in the Inbound Rule configuration specify source as /32.  **OR OPEN ALL TRAFFIC**
 
 ![NGINX Status](./Images-6/Image-6.15.jpg)
 
+**Next you disable the apache default web page**
+
+`sudo mv /etc/httpd/conf.d/welcome.conf /etc/httpd/conf.d/welcome.conf_backup`
+
 1. Install MySQL client and test that you can connect from your Web Server to your DB server by using `mysql-client`
 
-```
-sudo yum install mysql
-sudo mysql -u admin -p -h <DB-Server-Private-IP-address>
-```
+
+`sudo yum install mysql`
+
+`sudo mysql -u wordpress -p -h <DB server public address>`
 
 2. Verify if you can successfully execute` SHOW DATABASES;` command and see a list of existing databases.
 
@@ -231,6 +254,25 @@ sudo mysql -u admin -p -h <DB-Server-Private-IP-address>
 
 3. Change permissions and configuration so Apache could use WordPress:
 
+`sudo vi /var/www/html/wordpress/wp-config.php`
+
+
+ * **Configure** `DB_NAME`, `DB_USER`, `DB_PASSWORD`, and `DB_HOST`
+
+ `sudo systemctl restart httpd`
+
+
+![NGINX Status](./Images-6/Image-6.18.jpg)
+
+
+`sudo systemctl restart php-fpm`
+
 4. Enable TCP port 80 in Inbound Rules configuration for your Web Server EC2 (enable from everywhere 0.0.0.0/0 or from your workstation’s IP)
 
 5. Try to access from your browser the link to your WordPress `http://<Web-Server-Public-IP-Address>/wordpress/`
+
+![NGINX Status](./Images-6/Image-6.19.jpg)
+ 
+Fill out your DB credentials:
+
+![NGINX Status](./Images-6/Image-6.20.jpg)
